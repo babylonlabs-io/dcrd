@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/common"
 )
 
 // References:
@@ -591,12 +592,14 @@ func sign(privKey, nonce *secp256k1.ModNScalar, hash []byte) (*Signature, byte, 
 	//
 	// Step 2.
 	//
-	// Compute kG
+	// Compute kG (with blinding in order to prevent timing side channel attacks)
 	//
 	// Note that the point must be in affine coordinates.
-	k := nonce
-	var kG secp256k1.JacobianPoint
-	secp256k1.ScalarBaseMultNonConst(k, &kG)
+	k := *nonce
+	kG, err := common.ScalarBaseMultWithBlinding(&k)
+	if err != nil {
+		return nil, 0, false
+	}
 	kG.ToAffine()
 
 	// Step 3.
@@ -645,7 +648,7 @@ func sign(privKey, nonce *secp256k1.ModNScalar, hash []byte) (*Signature, byte, 
 	// s = k^-1(e + dr) mod N
 	// Repeat from step 1 if s = 0
 	// s = -s if s > N/2
-	kinv := new(secp256k1.ModNScalar).InverseValNonConst(k)
+	kinv := new(secp256k1.ModNScalar).InverseValNonConst(&k)
 	s := new(secp256k1.ModNScalar).Mul2(privKey, &r).Add(&e).Mul(kinv)
 	if s.IsZero() {
 		return nil, 0, false

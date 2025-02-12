@@ -10,6 +10,7 @@ import (
 
 	"github.com/decred/dcrd/crypto/blake256"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/common"
 )
 
 const (
@@ -268,10 +269,12 @@ func schnorrSign(privKey, nonce *secp256k1.ModNScalar, hash []byte) (*Signature,
 	//
 	// Step 4.
 	//
-	// R = kG
-	var R secp256k1.JacobianPoint
+	// R = kG (with blinding in order to prevent timing side channel attacks)
 	k := *nonce
-	secp256k1.ScalarBaseMultNonConst(&k, &R)
+	R, err := common.ScalarBaseMultWithBlinding(&k)
+	if err != nil {
+		return nil, err
+	}
 
 	// Step 5.
 	//
